@@ -10,11 +10,11 @@ from pysc2.lib import stopwatch
 from absl import app
 from absl import flags
 
-from sc2_agents.base_rl_agent import BaseRLAgent as Agent
+from sc2_agents.simple_double_Q_agent import SC2DoubleQAgent as Agent
 
 FLAGS = flags.FLAGS
 flags.DEFINE_bool("render", True, "Whether to render with pygame.")
-flags.DEFINE_bool("train", False, "Whether we are training or running")
+flags.DEFINE_bool("train", True, "Whether we are training or running")
 flags.DEFINE_integer("screen_resolution", 28,
                      "Resolution for screen feature layers.")
 flags.DEFINE_integer("minimap_resolution", 64,

@@ -54,28 +54,29 @@ class DQNCNN(nn.Module):
     return x
 
 
-class BaseRLAgent(BaseAgent):
+class SC2DoubleQAgent(BaseAgent):
   def __init__(self):
-    super(BaseRLAgent, self).__init__()
+    super(SC2DoubleQAgent, self).__init__()
     self.training = False
-    self.max_frames = 500000
-    self._epsilon = Epsilon(start=0.1, end=0.1, update_increment=0.01)
+    self.max_frames = 5000000
+    self._epsilon = Epsilon(start=1.0, end=0.1, update_increment=0.0001)
     self.gamma = 0.99
     self.train_q_per_step = 4
     self.train_q_batch_size = 256
     self.steps_before_training = 10000
-    self.target_q_update_frequency = 10000
+    self.target_q_update_frequency = 50000
 
-    self._Q_weights_path = "./data/SC2QAgent"
+    self._Q_weights_path = "./data/SC2DoubleQAgent"
     self._Q = DQNCNN()
     if os.path.isfile(self._Q_weights_path):
       self._Q.load_state_dict(torch.load(self._Q_weights_path))
+      print("Loading weights:", self._Q_weights_path)
     self._Qt = copy.deepcopy(self._Q)
     self._Q.cuda()
     self._Qt.cuda()
     self._optimizer = optim.Adam(self._Q.parameters(), lr=1e-8)
     self._criterion = nn.MSELoss()
-    self._memory = ReplayMemory(200000)
+    self._memory = ReplayMemory(100000)
 
     self._loss = deque(maxlen=1000)
     self._max_q = deque(maxlen=1000)
@@ -189,7 +190,9 @@ class BaseRLAgent(BaseAgent):
           if total_frames % self.target_q_update_frequency == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
             self._Qt = copy.deepcopy(self._Q)
             self.show_chart()
-            # pass
+
+          if total_frames % 1000 == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
+            self.show_chart()
 
           if not self._epsilon.isTraining and total_frames % 3 == 0:
             self.show_chart()

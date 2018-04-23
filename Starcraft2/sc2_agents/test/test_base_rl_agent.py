@@ -1,5 +1,5 @@
 import unittest
-from sc2_agents.base_rl_agent import DQNCNN, BaseRLAgent
+from sc2_agents.simple_double_Q_agent import DQNCNN, BaseRLAgent
 
 import numpy as np
 
