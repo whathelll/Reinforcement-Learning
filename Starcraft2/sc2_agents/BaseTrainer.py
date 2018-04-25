@@ -13,7 +13,7 @@ from absl import flags
 from sc2_agents.simple_double_Q_agent import SC2DoubleQAgent as Agent
 
 FLAGS = flags.FLAGS
-flags.DEFINE_bool("render", True, "Whether to render with pygame.")
+flags.DEFINE_bool("render", False, "Whether to render with pygame.")
 flags.DEFINE_bool("train", True, "Whether we are training or running")
 flags.DEFINE_integer("screen_resolution", 28,
                      "Resolution for screen feature layers.")

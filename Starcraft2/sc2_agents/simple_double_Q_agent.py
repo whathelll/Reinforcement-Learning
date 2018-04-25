@@ -58,7 +58,7 @@ class SC2DoubleQAgent(BaseAgent):
   def __init__(self):
     super(SC2DoubleQAgent, self).__init__()
     self.training = False
-    self.max_frames = 5000000
+    self.max_frames = 2000000
     self._epsilon = Epsilon(start=1.0, end=0.1, update_increment=0.0001)
     self.gamma = 0.99
     self.train_q_per_step = 4
@@ -245,7 +245,7 @@ class SC2DoubleQAgent(BaseAgent):
 
     s, a, s_1, r, done = self._memory.sample(self.train_q_batch_size)
     s = Variable(torch.from_numpy(s).cuda()).float()
-    a = Variable(torch.from_numpy(a).cuda()).long().unsqueeze(1)
+    a = Variable(torch.from_numpy(a).cuda()).long()
     s_1 = Variable(torch.from_numpy(s_1).cuda(), volatile=True).float()
     r = Variable(torch.from_numpy(r).cuda()).float()
     done = Variable(torch.from_numpy(1 - done).cuda()).float()
