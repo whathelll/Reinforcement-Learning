@@ -24,6 +24,9 @@ class TestPrioritisedReplayMemory(unittest.TestCase):
     self.assertEqual(s1.shape, (2, 4))
     self.assertEqual(r.shape, (2, 1))
     self.assertEqual(done.shape, (2, 1))
+
+    self.assertEqual(indices.shape, (2,))
+    # self.assertEqual(weights.shape, (2,1))
     # print(self.memory.sample())
 
   def test_update(self):
@@ -35,6 +38,7 @@ class TestPrioritisedReplayMemory(unittest.TestCase):
     self.assertEqual(self.memory.errors[1], 2.1)
     self.assertEqual(self.memory.errors[3], 5.1)
     # print(self.memory)
+    # self.memory.sample(2)
 
 
 if __name__ == "__main__":
