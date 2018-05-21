@@ -10,7 +10,9 @@ from pysc2.lib import stopwatch
 from absl import app
 from absl import flags
 
-from sc2_agents.simple_double_Q_agent import SC2DoubleQAgent as Agent
+# from sc2_agents.dqn_double_q_agent import DQNDoubleQAgent as Agent
+# from sc2_agents.dqn_dueling_agent import DQNDuelingAgent as Agent
+from sc2_agents.dqn_per_agent import DQNPERAgent as Agent
 
 FLAGS = flags.FLAGS
 flags.DEFINE_bool("render", False, "Whether to render with pygame.")

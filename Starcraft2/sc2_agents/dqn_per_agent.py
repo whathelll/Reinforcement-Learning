@@ -6,10 +6,9 @@ import math
 import numpy as np
 import copy
 import os.path
-from utils.replay_memory import ReplayMemory, Transition
+from utils.replay_memory import ReplayMemory, Transition, PrioritisedReplayMemory
 from collections import deque
 import matplotlib.pyplot as plt
-plt.ion()
 
 import torch
 import torch.nn as nn
@@ -19,6 +18,8 @@ from torch.autograd import Variable
 
 from pysc2.lib import actions
 from pysc2.lib import features
+
+plt.ion()
 
 
 _PLAYER_RELATIVE = features.SCREEN_FEATURES.player_relative.index
@@ -38,25 +39,34 @@ _SELECT_POINT = actions.FUNCTIONS.select_point.id
 # output is screen at 2x84x84
 #    1st dim = select point
 #    2nd dim = move screen
-class DQNCNN(nn.Module):
+class DQNPERCNN(nn.Module):
   def __init__(self, *args):
-    super(DQNCNN, self).__init__(*args)
+    super(DQNPERCNN, self).__init__(*args)
     self.conv1 = nn.Conv2d(1, 24, kernel_size=3, stride=1, padding=1)
     self.conv2 = nn.Conv2d(24, 24, kernel_size=3, stride=1, padding=2, dilation=2)
     self.conv3 = nn.Conv2d(24, 1, kernel_size=3, stride=1, padding=4, dilation=4)
     # self.conv4 = nn.Conv2d(24, 1, kernel_size=3, stride=1, padding=8, dilation=8)
+    self.linear1 = nn.Linear(1*24*28*28, 1024)
+    self.linear2 = nn.Linear(1024, 1)
 
   def forward(self, x):
     x = F.relu(self.conv1(x))
     x = F.relu(self.conv2(x))
-    # x = F.relu(self.conv3(x))
-    x = self.conv3(x)
-    return x
+    a = self.conv3(x)
+    v = x.view(x.size()[0], -1)
+    v = self.linear1(v)
+    v = self.linear2(v)
+    action = a.view(a.size()[0], -1)
+    N = action.size()[1]
+
+    q = v + 1 / N * action
+
+    return q
 
 
-class SC2DoubleQAgent(BaseAgent):
+class DQNPERAgent(BaseAgent):
   def __init__(self):
-    super(SC2DoubleQAgent, self).__init__()
+    super(DQNPERAgent, self).__init__()
     self.training = False
     self.max_frames = 2000000
     self._epsilon = Epsilon(start=1.0, end=0.1, update_increment=0.0001)
@@ -66,24 +76,28 @@ class SC2DoubleQAgent(BaseAgent):
     self.steps_before_training = 10000
     self.target_q_update_frequency = 50000
 
-    self._Q_weights_path = "./data/SC2DoubleQAgent"
-    self._Q = DQNCNN()
+    self._Q_weights_path = "./data/DQNPERQAgent"
+    self._Q = DQNPERCNN()
     if os.path.isfile(self._Q_weights_path):
       self._Q.load_state_dict(torch.load(self._Q_weights_path))
       print("Loading weights:", self._Q_weights_path)
-    self._Qt = copy.deepcopy(self._Q)
+    self._Qt = DQNPERCNN()
+
+    self._Qt.load_state_dict(self._Q.state_dict())
+    for param in self._Qt.parameters():
+      param.requires_grad = False
     self._Q.cuda()
     self._Qt.cuda()
     self._optimizer = optim.Adam(self._Q.parameters(), lr=1e-8)
     self._criterion = nn.MSELoss()
-    self._memory = ReplayMemory(100000)
+    self._memory = PrioritisedReplayMemory(capacity=10000, e=0.1, alpha=0.5)
 
     self._loss = deque(maxlen=1000)
     self._max_q = deque(maxlen=1000)
     self._action = None
     self._screen = None
-    self._fig = plt.figure()
-    self._plot = [plt.subplot(2, 2, i+1) for i in range(4)]
+    # self._fig = plt.figure()
+    # self._plot = [plt.subplot(2, 2, i+1) for i in range(4)]
 
     self._screen_size = 28
 
@@ -153,7 +167,6 @@ class SC2DoubleQAgent(BaseAgent):
         # remove unit selection from the equation by selecting the friendly on every new game.
         select_friendly = self.select_friendly_action(obs)
         obs = env.step([select_friendly])[0]
-        # distance = self.get_reward(obs.observation["screen"])
 
         self.reset()
 
@@ -162,8 +175,6 @@ class SC2DoubleQAgent(BaseAgent):
 
           self._screen = obs.observation["screen"][5]
           s = np.expand_dims(obs.observation["screen"][5], 0)
-          # plt.imshow(s[5])
-          # plt.pause(0.00001)
           if max_frames and total_frames >= max_frames:
             print("max frames reached")
             return
@@ -188,14 +199,15 @@ class SC2DoubleQAgent(BaseAgent):
             # pass
 
           if total_frames % self.target_q_update_frequency == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
-            self._Qt = copy.deepcopy(self._Q)
-            self.show_chart()
+            self._Qt.load_state_dict(self._Q.state_dict())
+            self._Qt.train()
+            # self.j()
 
-          if total_frames % 1000 == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
-            self.show_chart()
+          # if total_frames % 1000 == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
+            # self.j()
 
-          if not self._epsilon.isTraining and total_frames % 3 == 0:
-            self.show_chart()
+          # if not self._epsilon.isTraining and total_frames % 3 == 0:
+            # self.j()
 
     except KeyboardInterrupt:
       pass
@@ -205,21 +217,8 @@ class SC2DoubleQAgent(BaseAgent):
       print("Took %.3f seconds for %s steps: %.3f fps" % (
           elapsed_time, total_frames, total_frames / elapsed_time))
 
-  def get_reward(self, s):
-    player_relative = s[_PLAYER_RELATIVE]
-    neutral_y, neutral_x = (player_relative == _PLAYER_NEUTRAL).nonzero()
-    neutral_target = [int(neutral_x.mean()), int(neutral_y.mean())]
-    friendly_y, friendly_x = (player_relative == _PLAYER_FRIENDLY).nonzero()
-    if len(friendly_y) == 0 or len(friendly_x) == 0:   # this is shit
-      return 0
-    friendly_target = [int(friendly_x.mean()), int(friendly_y.mean())]
 
-    distance_2 = (neutral_target[0]-friendly_target[0])**2 + (neutral_target[1]-friendly_target[1])**2
-    distance = math.sqrt(distance_2)
-    return -distance
-
-
-  def show_chart(self):
+  def j(self):
     self._plot[0].clear()
     self._plot[0].set_xlabel('Last 1000 Training Cycles')
     self._plot[0].set_ylabel('Loss')
@@ -243,10 +242,12 @@ class SC2DoubleQAgent(BaseAgent):
     if self.train_q_batch_size >= len(self._memory):
       return
 
-    s, a, s_1, r, done = self._memory.sample(self.train_q_batch_size)
+    # s, a, s_1, r, done = self._memory.sample(self.train_q_batch_size)
+    transition, indices = self._memory.sample(self.train_q_batch_size)
+    s, a, s_1, r, done = transition
     s = Variable(torch.from_numpy(s).cuda()).float()
     a = Variable(torch.from_numpy(a).cuda()).long()
-    s_1 = Variable(torch.from_numpy(s_1).cuda(), volatile=True).float()
+    s_1 = Variable(torch.from_numpy(s_1).cuda()).float()
     r = Variable(torch.from_numpy(r).cuda()).float()
     done = Variable(torch.from_numpy(1 - done).cuda()).float()
 
@@ -263,11 +264,16 @@ class SC2DoubleQAgent(BaseAgent):
     # Q
     # y = r + done * self.gamma * Qt.max(dim=1)[0].unsqueeze(1)
 
-    y.volatile = False
-
     loss = self._criterion(Q, y)
+
+    error = Q - y
+    loss = (error) ** 2
+    loss = loss.mean()
+    #         weights = Variable(torch.from_numpy(weights)).float()
+    self._memory.update(indices, error.squeeze().cpu().data.numpy())
+
     self._loss.append(loss.sum().cpu().data.numpy())
-    self._max_q.append(Q.max().cpu().data.numpy()[0])
+    self._max_q.append(Q.max().cpu().data.numpy())
     self._optimizer.zero_grad()   # zero the gradient buffers
     loss.backward()
     self._optimizer.step()
