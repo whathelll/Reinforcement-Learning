@@ -60,6 +60,7 @@ class DQNPERCNN(nn.Module):
     N = action.size()[1]
 
     q = v + 1 / N * action
+    q = q.view(a.size()[0], a.size()[1], a.size()[2], a.size()[3])
 
     return q
 
@@ -68,8 +69,8 @@ class DQNPERAgent(BaseAgent):
   def __init__(self):
     super(DQNPERAgent, self).__init__()
     self.training = False
-    self.max_frames = 2000000
-    self._epsilon = Epsilon(start=1.0, end=0.1, update_increment=0.0001)
+    self.max_frames = 4000000
+    self._epsilon = Epsilon(start=1.0, end=0.15, update_increment=0.0001)
     self.gamma = 0.99
     self.train_q_per_step = 4
     self.train_q_batch_size = 256
@@ -90,14 +91,14 @@ class DQNPERAgent(BaseAgent):
     self._Qt.cuda()
     self._optimizer = optim.Adam(self._Q.parameters(), lr=1e-8)
     self._criterion = nn.MSELoss()
-    self._memory = PrioritisedReplayMemory(capacity=10000, e=0.1, alpha=0.5)
+    self._memory = PrioritisedReplayMemory(capacity=40000, e=0.1, alpha=0.5)
 
     self._loss = deque(maxlen=1000)
     self._max_q = deque(maxlen=1000)
     self._action = None
     self._screen = None
-    # self._fig = plt.figure()
-    # self._plot = [plt.subplot(2, 2, i+1) for i in range(4)]
+    self._fig = plt.figure()
+    self._plot = [plt.subplot(2, 2, i+1) for i in range(4)]
 
     self._screen_size = 28
 
@@ -201,13 +202,13 @@ class DQNPERAgent(BaseAgent):
           if total_frames % self.target_q_update_frequency == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
             self._Qt.load_state_dict(self._Q.state_dict())
             self._Qt.train()
-            # self.j()
+            # self.plot()
 
-          # if total_frames % 1000 == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
-            # self.j()
+          if total_frames % 1000 == 0 and total_frames > self.steps_before_training and self._epsilon.isTraining:
+            self.plot()
 
-          # if not self._epsilon.isTraining and total_frames % 3 == 0:
-            # self.j()
+          if not self._epsilon.isTraining and total_frames % 3 == 0:
+            self.plot()
 
     except KeyboardInterrupt:
       pass
@@ -218,7 +219,7 @@ class DQNPERAgent(BaseAgent):
           elapsed_time, total_frames, total_frames / elapsed_time))
 
 
-  def j(self):
+  def plot(self):
     self._plot[0].clear()
     self._plot[0].set_xlabel('Last 1000 Training Cycles')
     self._plot[0].set_ylabel('Loss')

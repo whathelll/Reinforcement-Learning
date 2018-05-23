@@ -59,7 +59,7 @@ class DQNDuelingCNN(nn.Module):
     N = action.size()[1]
 
     q = v + 1 / N * action
-
+    q = q.view(a.size()[0], a.size()[1], a.size()[2], a.size()[3])
     return q
 
 
