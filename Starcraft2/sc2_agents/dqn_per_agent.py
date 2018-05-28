@@ -91,7 +91,7 @@ class DQNPERAgent(BaseAgent):
     self._Qt.cuda()
     self._optimizer = optim.Adam(self._Q.parameters(), lr=1e-8)
     self._criterion = nn.MSELoss()
-    self._memory = PrioritisedReplayMemory(capacity=40000, e=0.1, alpha=0.5)
+    self._memory = PrioritisedReplayMemory(capacity=3000, e=0.1, alpha=0.5)
 
     self._loss = deque(maxlen=1000)
     self._max_q = deque(maxlen=1000)
