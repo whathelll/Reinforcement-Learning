@@ -20,3 +20,6 @@ class RewardHistory(list):
     axarr[1].plot(std)
     plt.show()
 
+
+
+
