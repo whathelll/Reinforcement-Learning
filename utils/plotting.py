@@ -21,5 +21,25 @@ class RewardHistory(list):
     plt.show()
 
 
+class PlotHistory(list):
+  def __init__(self, name, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.name = name
 
-
+  def plot(self):
+    R = np.array(self)
+    mu = np.mean(R, axis=0)
+    std = np.std(R, axis=0)
+    f, axarr = plt.subplots(1, 2)
+    f.set_figheight(5)
+    f.set_figwidth(20)
+    f.subplots_adjust(hspace=0.2)
+    axarr[0].plot(mu)
+    axarr[0].set_title('Mean ' + self.name)
+    axarr[0].set_xlabel("Episodes")
+    axarr[0].set_ylabel(self.name)
+    axarr[1].set_title('Std')
+    axarr[1].set_xlabel("Episodes")
+    axarr[1].set_ylabel("std")
+    axarr[1].plot(std)
+    plt.show()
